@@ -6,6 +6,7 @@ import { CourseSchemaType, courseSchema } from "@/lib/zodSchemas";
 import { prisma } from "@/lib/db";
 import arcjet, { detectBot, fixedWindow } from "@/lib/arcjet";
 import { request } from "@arcjet/next";
+import { revalidatePath } from "next/cache";
 // import { User } from "lucide-react";
 // import { request } from "http";
 
@@ -109,3 +110,61 @@ export async function editCourse(data: CourseSchemaType, courseId: string): Prom
     }
 }
 
+export async function reorderLesson(
+    chapterId: string,
+    lesson: { id: string; position: number }[],
+    courseId: string
+): Promise<ApiResponse> {
+    try {
+        if (!lesson || lesson.length === 0) {
+            return {
+                status: "error",
+                message: "no lesson provided for reorderning"
+            };
+        }
+
+
+        // const updates = lesson.map((lesson) => ({
+        //     prisma.lesson.update({
+        //         where: {
+        //             id: lesson.id,
+        //             chapterId: chapterId,
+        //         },
+        //         data: {
+        //             position: lesson
+        //         }
+        //     })
+        // }))
+
+
+        const updates = lesson.map((lesson: { id: string; position: number }) =>
+            prisma.lesson.update({
+                where: {
+                    id: lesson.id,
+                    chapterId: chapterId,
+                },
+                data: {
+                    position: lesson.position,
+                }
+            })
+        );
+
+
+        await prisma.$transaction(updates);
+
+
+        revalidatePath(`/admin/courses/${courseId}/edit`)
+
+
+        return {
+            status: "success",
+            message: "lessons reorder successfully"
+        }
+    } catch {
+        return {
+            status: "error",
+            message: "failed to reorder lessson"
+        }
+    }
+
+}

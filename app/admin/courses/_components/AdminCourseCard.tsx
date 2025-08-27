@@ -133,7 +133,7 @@ export function AdminCourseCard({ data }: iAppProps) {
     const CourseImage = useConstructUrl(data.fileKey);
     return (
         <Card className="group relative py-0 gap-0">
-            {/* absolute dropdown */}
+            
             <div className="absolute top-2 right-2 z-10">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -141,12 +141,12 @@ export function AdminCourseCard({ data }: iAppProps) {
                             <MoreVertical className="size-4" />
                         </Button>
                     </DropdownMenuTrigger>
-                    {/* [CHANGE HERE] ડ્રોપડાઉન મેનુના કન્ટેનરને કસ્ટમ સ્ટાઇલ આપી */}
+                    
                     <DropdownMenuContent 
                         align="end" 
                         className="w-48 bg-[#2D2D2D] border-gray-700 text-gray-200"
                     >
-                        {/* [CHANGE HERE] મેનુ આઇટમને કસ્ટમ સ્ટાઇલ આપી */}
+                        
                         <DropdownMenuItem asChild className="cursor-pointer hover:!bg-gray-700 focus:!bg-gray-700 hover:!text-white">
                             <Link href={`/admin/courses/${data.id}/edit`}>
                                 <Pencil className="size-4 mr-2" />

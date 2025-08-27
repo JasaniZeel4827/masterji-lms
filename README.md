@@ -1,1090 +1,365 @@
-// "use client";
-
-// import { useCallback, useEffect, useState } from "react";
-// import { FileRejection, useDropzone } from "react-dropzone";
-// import { Card, CardContent } from "../ui/card";
-// import { cn } from "@/lib/utils";
-// import { RenderEmptyState, RenderErrorState, RenderUploadingState, RenderUploadState } from "./RenderState";
-// import { toast } from "sonner";
-// import { v4 as uuidv4 } from "uuid";
-// // import { resend } from "@/lib/resend";
-// import { resend } from "@/lib/resend";
-// import { useConstructUrl } from "@/hooks/use-construct-url";
-// // import { undefined } from "zod";
-// // import { resolve } from "path";
-
-// interface UploaderState {
-//     id: string | null;
-//     file: File | null;
-//     uploading: boolean;
-//     progress: number;
-//     key?: string;
-//     isDeleting: boolean;
-//     error: boolean;
-//     objectUrl: string;
-//     fileType: "image" | "video";
-// }
-
-
-// // interface
-
-// interface iAppProps {
-//     value?: string;
-//     onChange?: (value: string) => void;
-// }
-
-// // Helper function to safely construct a URL
-// const getSafeUrl = (url: string): string | null => {
-//   if (!url) return null;
-
-//   // If it's already a full URL, return as is
-//   if (url.startsWith('http')) {
-//     try {
-//       new URL(url);
-//       return url;
-//     } catch {
-//       return null;
-//     }
-//   }
-
-//   // Otherwise, try to construct with base URL
-//   const baseUrl = process.env.NEXT_PUBLIC_S3_BASE_URL || '';
-//   if (!baseUrl) return null;
-
-//   // Remove any leading/trailing slashes for clean concatenation
-//   const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-//   const cleanPath = url.startsWith('/') ? url.slice(1) : url;
-
-//   try {
-//     const fullUrl = `${cleanBase}/${cleanPath}`;
-//     new URL(fullUrl); // Validate the constructed URL
-//     return fullUrl;
-//   } catch {
-//     return null;
-//   }
-// };
-
-// export function Uploader({ onChange, value }: iAppProps) {
-//     const [fileState, setFileState] = useState<UploaderState>(() => ({
-//         error: false,
-//         file: null,
-//         id: null,
-//         uploading: false,
-//         progress: 0,
-//         isDeleting: false,
-//         fileType: "image",
-//         objectUrl: getSafeUrl(value || '') || "",
-//         key: value || "",
-//     }));
-
-//     // Clean up object URLs when component unmounts or when they're no longer needed
-//     useEffect(() => {
-//         return () => {
-//             if (fileState.objectUrl && !fileState.objectUrl.startsWith('http')) {
-//                 URL.revokeObjectURL(fileState.objectUrl);
-//             }
-//         };
-//     }, [fileState.objectUrl]);
-
-//     useEffect(() => {
-//         if (value && value !== fileState.key) {
-//             const newUrl = getSafeUrl(value);
-
-//             if (newUrl) {
-//                 setFileState(prev => ({
-//                     ...prev,
-//                     objectUrl: newUrl,
-//                     key: value,
-//                     error: false
-//                 }));
-//             } else {
-//                 console.error('Failed to construct valid URL for value:', value);
-//                 setFileState(prev => ({
-//                     ...prev,
-//                     objectUrl: "",
-//                     key: "",
-//                     error: true
-//                 }));
-//             }
-//         } else if (!value && fileState.key) {
-//             // Clear the preview if value is removed
-//             setFileState(prev => ({
-//                 ...prev,
-//                 objectUrl: "",
-//                 key: "",
-//                 error: false
-//             }));
-//         }
-//     }, [value]);
-
-//     async function uploadFile(file: File) {
-//         setFileState((prev) => ({
-//             ...prev,
-//             uploading: true,
-//             progress: 0,
-//         }));
-
-//         try {
-//             console.log('Starting upload process for file:', file.name);
-
-//             // 1. First get the presigned URL from your API
-//             console.log('Requesting presigned URL...');
-//             const presignedResponse = await fetch("/api/s3/upload", {
-//                 method: "POST",
-//                 headers: { 
-//                     "Content-Type": "application/json",
-//                 },
-//                 body: JSON.stringify({
-//                     fileName: file.name,
-//                     contentType: file.type,
-//                     size: file.size,
-//                     isImage: true,
-//                 }),
-//             });
-
-//             if (!presignedResponse.ok) {
-//                 const errorText = await presignedResponse.text();
-//                 console.error('Failed to get presigned URL:', presignedResponse.status, errorText);
-//                 let errorMessage = 'Failed to get upload URL';
-//                 try {
-//                     const errorData = JSON.parse(errorText);
-//                     errorMessage = errorData.error || errorMessage;
-//                 } catch (e) {}
-//                 throw new Error(errorMessage);
-//             }
-
-//             const { presignedUrl, key } = await presignedResponse.json();
-//             console.log('Received presigned URL:', presignedUrl);
-
-//             if (!presignedUrl || !key) {
-//                 console.error('Invalid response from server - missing presignedUrl or key');
-//                 throw new Error('Invalid server response');
-//             }
-
-//             // 2. Upload the file to S3 using the presigned URL
-//             console.log('Uploading file to S3...');
-//             const uploadResponse = await fetch(presignedUrl, {
-//                 method: "PUT",
-//                 body: file,
-//                 headers: {
-//                     'Content-Type': file.type,
-//                     'Cache-Control': 'public, max-age=31536000',
-//                 },
-//             });
-
-//             console.log('Upload response status:', uploadResponse.status);
-
-//             if (!uploadResponse.ok) {
-//                 const errorText = await uploadResponse.text();
-//                 console.error('Upload failed:', uploadResponse.status, errorText);
-//                 throw new Error('Failed to upload file to storage');
-//             }
-
-//             console.log('File uploaded successfully, key:', key);
-
-//             // 3. Update the state and call the onChange callback
-//             setFileState(prev => ({
-//                 ...prev,
-//                 progress: 100,
-//                 uploading: false,
-//                 key,
-//                 error: false,
-//             }));
-
-//             // Call the parent component's onChange with the file key
-//             onChange?.(key);
-//             toast.success("File uploaded successfully");
-
-//         } catch (error) {
-//             console.error("Upload error:", error);
-//             const errorMessage = error instanceof Error ? error.message : 'Failed to upload file';
-//             toast.error(errorMessage);
-//             setFileState(prev => ({
-//                 ...prev,
-//                 uploading: false,
-//                 error: true,
-//                 progress: 0,
-//             }));
-//         }
-//     };
-
-//     const onDrop = useCallback((acceptedFiles: File[]) => {
-//         if (acceptedFiles.length === 0) return;
-
-//         const file = acceptedFiles[0];
-//         console.log('File selected:', file.name, 'Type:', file.type, 'Size:', file.size);
-
-//         // Only revoke object URL if it's a blob URL (starts with 'blob:')
-//         if (fileState.objectUrl && fileState.objectUrl.startsWith('blob:')) {
-//             URL.revokeObjectURL(fileState.objectUrl);
-//         }
-
-//         // Validate file type
-//         if (!file.type.startsWith('image/')) {
-//             toast.error('Only image files are allowed');
-//             return;
-//         }
-
-//         // Validate file size (5MB max)
-//         const maxSize = 5 * 1024 * 1024; // 5MB
-//         if (file.size > maxSize) {
-//             toast.error('File size must be less than 5MB');
-//             return;
-//         }
-
-//         // Create object URL for preview
-//         const objectUrl = URL.createObjectURL(file);
-
-//         setFileState({
-//             file,
-//             uploading: false,
-//             progress: 0,
-//             objectUrl,
-//             id: uuidv4(),
-//             isDeleting: false,
-//             fileType: "image",
-//             error: false,
-//             key: undefined, // Clear the existing key when a new file is selected
-//         });
-
-//         // Start the upload process
-//         uploadFile(file);
-
-//     }, [fileState.objectUrl]);
-
-//     async function handleRemoveFile() {
-//         if (fileState.isDeleting || !fileState.objectUrl)
-//             return;
-//         try {
-//             setFileState((prev) => ({
-//                 ...prev,
-//                 isDeleting: true,
-//             }));
-
-//             const response = await fetch('/api/s3/delete', {
-//                 method: "DELETE",
-//                 headers: { "Content-Type": "application/json" },
-//                 body: JSON.stringify({
-//                     key: fileState.key,
-//                 })
-//             });
-
-//             if (!response.ok) {
-//                 toast.error('Failed to remove file from database');
-//                 setFileState((prev) => ({
-//                     ...prev,
-//                     isDeleting: false,
-//                     error: true,
-//                 }));
-
-//                 return;
-//             }
-
-//             if (fileState.objectUrl && !fileState.objectUrl.startsWith("http")) {
-//                 URL.revokeObjectURL(fileState.objectUrl);
-//             }
-
-//             setFileState({
-//                 file: null,
-//                 uploading: false,
-//                 progress: 0,
-//                 objectUrl: "",
-//                 error: false,
-//                 fileType: 'image',
-//                 id: null,
-//                 isDeleting: false,
-//             });
-
-//             toast.success('File removed successfully')
-//         } catch {
-//             toast.error('Error removing file, please try again')
-//             setFileState((prev) => ({
-//                 ...prev,
-//                 isDeleting: false,
-//                 error: true,
-//             }));
-//         }
-//     }
-
-//     function rejectedFiles(fileRejection: FileRejection[]) {
-//         if (fileRejection.length) {
-//             const tooManyFiles = fileRejection.find((r) => r.errors[0].code === "too-many-files");
-//             const fileSizeTooBig = fileRejection.find((r) => r.errors[0].code === "file-too-large");
-
-//             if (fileSizeTooBig) toast.error("File size limit exceeds");
-//             if (tooManyFiles) toast.error("Too many files selected, max is 1");
-//         }
-//     }
-
-//     const renderContent = () => {
-//         if (fileState.uploading && fileState.file) {
-//             return <RenderUploadingState file={fileState.file} progress={fileState.progress} />;
-//         }
-//         if (fileState.error) {
-//             return <RenderErrorState />;
-//         }
-
-//         // Only show the uploaded image if we have a valid objectUrl and a file or key
-//         if (fileState.objectUrl && (fileState.file || fileState.key)) {
-//             return (
-//                 <RenderUploadState
-//                     previewUrl={fileState.objectUrl}
-//                     isDeleting={fileState.isDeleting}
-//                     handleRemoveFile={handleRemoveFile}
-//                 />
-//             );
-//         }
-
-//         // Default to empty state when no file is selected
-//         return <RenderEmptyState isDragActive={isDragActive} />;
-//     };
-
-//     useEffect(() => {
-//         return () => {
-//             if (fileState.objectUrl && !fileState.objectUrl.startsWith("http")) {
-//                 URL.revokeObjectURL(fileState.objectUrl);
-//             }
-//         };
-//     }, [fileState.objectUrl]);
-
-//     const { getRootProps, getInputProps, isDragActive } = useDropzone({
-//         onDrop,
-//         accept: { "image/*": [] },
-//         maxFiles: 1,
-//         multiple: false,
-//         maxSize: 5 * 1024 * 1024,
-//         onDropRejected: rejectedFiles,
-//         disabled: fileState.uploading || !!fileState.objectUrl,
-//     });
-
-//     return (
-//         <Card
-//             {...getRootProps()}
-//             className={cn(
-//                 "relative border-2 border-dashed transition-colors duration-200 ease-in-out w-full h-64",
-//                 isDragActive ? "border-primary bg-primary/10 border-solid" : "border-border hover:border-primary"
-//             )}
-//         >
-//             <CardContent className="flex items-center justify-center h-full w-full p-4">
-//                 <input {...getInputProps()} />
-//                 {renderContent()}
-//             </CardContent>
-//         </Card>
-//     );
-// }
-
-
-
-
-
-
-// "use client";
-
-
-
-// import { useCallback } from "react";
-// import { useDropzone } from "react-dropzone";
-
-// export function Uploader() {
-
-
-//     const onDrop = useCallback((acceptedFiles: File[]) => {
-//         console.log(acceptedFiles)
-//     }, []);
-
-// }
-// const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
-// return (
-//     <div{...getRootProps()}>
-//         <input {...getInputProps()} />
-//         {isDragActive ? (
-//             <p>Drop the file here</p>
-//         ) : (
-//             <p>Drag your course image here, click to select the image</p>
-//         )}
-//     </div>
-// )
-
-
-
-
-
-
-
-
-"use client";
-
-import { useCallback, useState } from "react";
-import { FileRejection, useDropzone } from "react-dropzone";
-import { Card, CardContent } from "../ui/card";
-import { cn } from "@/lib/utils";
-import { RenderEmptyState } from "./RenderState";
-import { toast } from "sonner";
-import { v4 as uuidv4 } from "uuid";
-import { set } from "zod";
-// import { uuidv4 } from "zod";
-
-
-
-interface UploaderState {
-    id: string | null;
-    file: File | null;
-    uploading: boolean;
-    progress: number;
-    key?: string;
-    isDeleting: boolean;
-    error: boolean;
-    objectUrl: string;
-    fileType: "image" | "video";
-}
-
-
-
-
-export function Uploader() {
-    const [fileState, setFileState] = useState<UploaderState>({
-        error: false,
-        file: null,
-        id: null,
-        uploading: false,
-        progress: 0,
-        isDeleting: false,
-        fileType: "image",
-    });
-
-
-    function uploadFile(file: File) {
-        setFileState((prev) => ({
-            ...prev,
-            uploading: true,
-            progress: 0,
-        }));
-
-    }
-    const onDrop = useCallback((acceptedFiles: File[]) => {
-        if(acceptedFiles.length > 0) {
-            const file = acceptedFiles[0]
-
-            setFileState({
-                file: file,
-                uploading: false,
-                progress: 0,
-                objectUrl: URL.createObjectURL(file),
-                error: false,
-                id: uuidv4(),
-                isDeleting: false,
-                fileType: "image"
-            })
-        }
-        console.log(acceptedFiles)
-    }, []);
-
-    function rejectedFiles(fileRejection: FileRejection[]) {
-        if (fileRejection.length) {
-            const tooManyFiles = fileRejection.find((rejection) => rejection.errors[0].code === "too-many-files");
-            const fileSizeTooBig = fileRejection.find(
-                (rejection) => rejection.errors[0].code === "file-too-large"
-            );
-
-            if (fileSizeTooBig) {
-                toast.error("file size limit exceeds");
-            }
-
-            if (tooManyFiles) {
-                toast.error("Too many files selected, max is 1");
-            }
-        }
-    }
-
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({
-        onDrop,
-        accept: { "image/*": [] },
-        maxFiles: 1,
-        multiple: false,
-        maxSize: 5 * 1024 * 1024, // 5MB
-        onDropRejected: rejectedFiles,
-    });
-
-    return (
-        <Card {...getRootProps()} className={cn(
-            "relative border-2 border-dashed transition-colors duration-200 ease-in-out w-full h-64",
-            isDragActive ? 'border-primary bg-primary/10 border-solid' : 'border-border hover:border-primary'
-        )}
-        >
-            <CardContent className="flex items-center justify-center h-full w-full p-4">
-                <input {...getInputProps()} />
-                <RenderEmptyState isDragActive={isDragActive} />
-            </CardContent>
-        </Card>
-    );
-}
-
-
-
-
-// code for backup
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// "use client";
-
-// import { useCallback, useEffect, useState } from "react";
-// import { FileRejection, useDropzone } from "react-dropzone";
-// import { Card, CardContent } from "../ui/card";
-// import { cn } from "@/lib/utils";
-// import { RenderEmptyState, RenderErrorState, RenderUploadingState, RenderUploadState } from "./RenderState";
-// import { toast } from "sonner";
-// import { v4 as uuidv4 } from "uuid";
-// // import { resend } from "@/lib/resend";
-// import { resend } from "@/lib/resend";
-// import { useConstructUrl } from "@/hooks/use-construct-url";
-// // import { undefined } from "zod";
-// // import { resolve } from "path";
-
-// interface UploaderState {
-//     id: string | null;
-//     file: File | null;
-//     uploading: boolean;
-//     progress: number;
-//     key?: string;
-//     isDeleting: boolean;
-//     error: boolean;
-//     objectUrl: string;
-//     fileType: "image" | "video";
-// }
-
-
-// // interface
-
-// interface iAppProps {
-//     value?: string;
-//     onChange?: (value: string) => void;
-// }
-
-// // Helper function to safely construct a URL
-// const getSafeUrl = (url: string): string | null => {
-//   if (!url) return null;
-
-//   // If it's already a full URL, return as is
-//   if (url.startsWith('http')) {
-//     try {
-//       new URL(url);
-//       return url;
-//     } catch {
-//       return null;
-//     }
-//   }
-
-//   // Otherwise, try to construct with base URL
-//   const baseUrl = process.env.NEXT_PUBLIC_S3_BASE_URL || '';
-//   if (!baseUrl) return null;
-
-//   // Remove any leading/trailing slashes for clean concatenation
-//   const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-//   const cleanPath = url.startsWith('/') ? url.slice(1) : url;
-
-//   try {
-//     const fullUrl = `${cleanBase}/${cleanPath}`;
-//     new URL(fullUrl); // Validate the constructed URL
-//     return fullUrl;
-//   } catch {
-//     return null;
-//   }
-// };
-
-// export function Uploader({ onChange, value }: iAppProps) {
-//     const [fileState, setFileState] = useState<UploaderState>(() => ({
-//         error: false,
-//         file: null,
-//         id: null,
-//         uploading: false,
-//         progress: 0,
-//         isDeleting: false,
-//         fileType: "image",
-//         objectUrl: getSafeUrl(value || '') || "",
-//         key: value || "",
-//     }));
-
-//     // Clean up object URLs when component unmounts or when they're no longer needed
-//     useEffect(() => {
-//         return () => {
-//             if (fileState.objectUrl && !fileState.objectUrl.startsWith('http')) {
-//                 URL.revokeObjectURL(fileState.objectUrl);
-//             }
-//         };
-//     }, [fileState.objectUrl]);
-
-//     useEffect(() => {
-//         if (value && value !== fileState.key) {
-//             const newUrl = getSafeUrl(value);
-
-//             if (newUrl) {
-//                 setFileState(prev => ({
-//                     ...prev,
-//                     objectUrl: newUrl,
-//                     key: value,
-//                     error: false
-//                 }));
-//             } else {
-//                 console.error('Failed to construct valid URL for value:', value);
-//                 setFileState(prev => ({
-//                     ...prev,
-//                     objectUrl: "",
-//                     key: "",
-//                     error: true
-//                 }));
-//             }
-//         } else if (!value && fileState.key) {
-//             // Clear the preview if value is removed
-//             setFileState(prev => ({
-//                 ...prev,
-//                 objectUrl: "",
-//                 key: "",
-//                 error: false
-//             }));
-//         }
-//     }, [value]);
-
-//     async function uploadFile(file: File) {
-//         setFileState((prev) => ({
-//             ...prev,
-//             uploading: true,
-//             progress: 0,
-//         }));
-
-//         try {
-//             console.log('Starting upload process for file:', file.name);
-
-//             // 1. First get the presigned URL from your API
-//             console.log('Requesting presigned URL...');
-//             const presignedResponse = await fetch("/api/s3/upload", {
-//                 method: "POST",
-//                 headers: { 
-//                     "Content-Type": "application/json",
-//                 },
-//                 body: JSON.stringify({
-//                     fileName: file.name,
-//                     contentType: file.type,
-//                     size: file.size,
-//                     isImage: true,
-//                 }),
-//             });
-
-//             if (!presignedResponse.ok) {
-//                 const errorText = await presignedResponse.text();
-//                 console.error('Failed to get presigned URL:', presignedResponse.status, errorText);
-//                 let errorMessage = 'Failed to get upload URL';
-//                 try {
-//                     const errorData = JSON.parse(errorText);
-//                     errorMessage = errorData.error || errorMessage;
-//                 } catch (e) {}
-//                 throw new Error(errorMessage);
-//             }
-
-//             const { presignedUrl, key } = await presignedResponse.json();
-//             console.log('Received presigned URL:', presignedUrl);
-
-//             if (!presignedUrl || !key) {
-//                 console.error('Invalid response from server - missing presignedUrl or key');
-//                 throw new Error('Invalid server response');
-//             }
-
-//             // 2. Upload the file to S3 using the presigned URL
-//             console.log('Uploading file to S3...');
-//             const uploadResponse = await fetch(presignedUrl, {
-//                 method: "PUT",
-//                 body: file,
-//                 headers: {
-//                     'Content-Type': file.type,
-//                     'Cache-Control': 'public, max-age=31536000',
-//                 },
-//             });
-
-//             console.log('Upload response status:', uploadResponse.status);
-
-//             if (!uploadResponse.ok) {
-//                 const errorText = await uploadResponse.text();
-//                 console.error('Upload failed:', uploadResponse.status, errorText);
-//                 throw new Error('Failed to upload file to storage');
-//             }
-
-//             console.log('File uploaded successfully, key:', key);
-
-//             // 3. Update the state and call the onChange callback
-//             setFileState(prev => ({
-//                 ...prev,
-//                 progress: 100,
-//                 uploading: false,
-//                 key,
-//                 error: false,
-//             }));
-
-//             // Call the parent component's onChange with the file key
-//             onChange?.(key);
-//             toast.success("File uploaded successfully");
-
-//         } catch (error) {
-//             console.error("Upload error:", error);
-//             const errorMessage = error instanceof Error ? error.message : 'Failed to upload file';
-//             toast.error(errorMessage);
-//             setFileState(prev => ({
-//                 ...prev,
-//                 uploading: false,
-//                 error: true,
-//                 progress: 0,
-//             }));
-//         }
-//     };
-
-//     const onDrop = useCallback((acceptedFiles: File[]) => {
-//         if (acceptedFiles.length === 0) return;
-
-//         const file = acceptedFiles[0];
-//         console.log('File selected:', file.name, 'Type:', file.type, 'Size:', file.size);
-
-//         // Only revoke object URL if it's a blob URL (starts with 'blob:')
-//         if (fileState.objectUrl && fileState.objectUrl.startsWith('blob:')) {
-//             URL.revokeObjectURL(fileState.objectUrl);
-//         }
-
-//         // Validate file type
-//         if (!file.type.startsWith('image/')) {
-//             toast.error('Only image files are allowed');
-//             return;
-//         }
-
-//         // Validate file size (5MB max)
-//         const maxSize = 5 * 1024 * 1024; // 5MB
-//         if (file.size > maxSize) {
-//             toast.error('File size must be less than 5MB');
-//             return;
-//         }
-
-//         // Create object URL for preview
-//         const objectUrl = URL.createObjectURL(file);
-
-//         setFileState({
-//             file,
-//             uploading: false,
-//             progress: 0,
-//             objectUrl,
-//             id: uuidv4(),
-//             isDeleting: false,
-//             fileType: "image",
-//             error: false,
-//             key: undefined, // Clear the existing key when a new file is selected
-//         });
-
-//         // Start the upload process
-//         uploadFile(file);
-
-//     }, [fileState.objectUrl]);
-
-//     async function handleRemoveFile() {
-//         if (fileState.isDeleting || !fileState.objectUrl)
-//             return;
-//         try {
-//             setFileState((prev) => ({
-//                 ...prev,
-//                 isDeleting: true,
-//             }));
-
-//             const response = await fetch('/api/s3/delete', {
-//                 method: "DELETE",
-//                 headers: { "Content-Type": "application/json" },
-//                 body: JSON.stringify({
-//                     key: fileState.key,
-//                 })
-//             });
-
-//             if (!response.ok) {
-//                 toast.error('Failed to remove file from database');
-//                 setFileState((prev) => ({
-//                     ...prev,
-//                     isDeleting: false,
-//                     error: true,
-//                 }));
-
-//                 return;
-//             }
-
-//             if (fileState.objectUrl && !fileState.objectUrl.startsWith("http")) {
-//                 URL.revokeObjectURL(fileState.objectUrl);
-//             }
-
-//             setFileState({
-//                 file: null,
-//                 uploading: false,
-//                 progress: 0,
-//                 objectUrl: "",
-//                 error: false,
-//                 fileType: 'image',
-//                 id: null,
-//                 isDeleting: false,
-//             });
-
-//             toast.success('File removed successfully')
-//         } catch {
-//             toast.error('Error removing file, please try again')
-//             setFileState((prev) => ({
-//                 ...prev,
-//                 isDeleting: false,
-//                 error: true,
-//             }));
-//         }
-//     }
-
-//     function rejectedFiles(fileRejection: FileRejection[]) {
-//         if (fileRejection.length) {
-//             const tooManyFiles = fileRejection.find((r) => r.errors[0].code === "too-many-files");
-//             const fileSizeTooBig = fileRejection.find((r) => r.errors[0].code === "file-too-large");
-
-//             if (fileSizeTooBig) toast.error("File size limit exceeds");
-//             if (tooManyFiles) toast.error("Too many files selected, max is 1");
-//         }
-//     }
-
-//     const renderContent = () => {
-//         if (fileState.uploading && fileState.file) {
-//             return <RenderUploadingState file={fileState.file} progress={fileState.progress} />;
-//         }
-//         if (fileState.error) {
-//             return <RenderErrorState />;
-//         }
-
-//         // Only show the uploaded image if we have a valid objectUrl and a file or key
-//         if (fileState.objectUrl && (fileState.file || fileState.key)) {
-//             return (
-//                 <RenderUploadState
-//                     previewUrl={fileState.objectUrl}
-//                     isDeleting={fileState.isDeleting}
-//                     handleRemoveFile={handleRemoveFile}
-//                 />
-//             );
-//         }
-
-//         // Default to empty state when no file is selected
-//         return <RenderEmptyState isDragActive={isDragActive} />;
-//     };
-
-//     useEffect(() => {
-//         return () => {
-//             if (fileState.objectUrl && !fileState.objectUrl.startsWith("http")) {
-//                 URL.revokeObjectURL(fileState.objectUrl);
-//             }
-//         };
-//     }, [fileState.objectUrl]);
-
-//     const { getRootProps, getInputProps, isDragActive } = useDropzone({
-//         onDrop,
-//         accept: { "image/*": [] },
-//         maxFiles: 1,
-//         multiple: false,
-//         maxSize: 5 * 1024 * 1024,
-//         onDropRejected: rejectedFiles,
-//         disabled: fileState.uploading || !!fileState.objectUrl,
-//     });
-
-//     return (
-//         <Card
-//             {...getRootProps()}
-//             className={cn(
-//                 "relative border-2 border-dashed transition-colors duration-200 ease-in-out w-full h-64",
-//                 isDragActive ? "border-primary bg-primary/10 border-solid" : "border-border hover:border-primary"
-//             )}
-//         >
-//             <CardContent className="flex items-center justify-center h-full w-full p-4">
-//                 <input {...getInputProps()} />
-//                 {renderContent()}
-//             </CardContent>
-//         </Card>
-//     );
-// }
-
-
-
-
-
-
-// "use client";
-
-
-
-// import { useCallback } from "react";
-// import { useDropzone } from "react-dropzone";
-
-// export function Uploader() {
-
-
-//     const onDrop = useCallback((acceptedFiles: File[]) => {
-//         console.log(acceptedFiles)
-//     }, []);
-
-// }
-// const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
-// return (
-//     <div{...getRootProps()}>
-//         <input {...getInputProps()} />
-//         {isDragActive ? (
-//             <p>Drop the file here</p>
-//         ) : (
-//             <p>Drag your course image here, click to select the image</p>
-//         )}
-//     </div>
-// )
-
-
-
-
-
-
-
-
-"use client";
-
-import { useCallback, useState } from "react";
-import { FileRejection, useDropzone } from "react-dropzone";
-import { Card, CardContent } from "../ui/card";
-import { cn } from "@/lib/utils";
-import { RenderEmptyState } from "./RenderState";
-import { toast } from "sonner";
-import { v4 as uuidv4 } from "uuid";
-
-// import { uuidv4 } from "zod";
-
-
-
-interface UploaderState {
-    id: string | null;
-    file: File | null;
-    uploading: boolean;
-    progress: number;
-    key?: string;
-    isDeleting: boolean;
-    error: boolean;
-    objectUrl: string;
-    fileType: "image" | "video";
-}
-
-
-
-
-export function Uploader() {
-    const [fileState, setFileState] = useState<UploaderState>({
-        error: false,
-        file: null,
-        id: null,
-        uploading: false,
-        progress: 0,
-        isDeleting: false,
-        fileType: "image",
-    });
-
-
-    function uploadFile(file: File) {
-        setFileState((prev) => ({
-            ...prev,
-            uploading: true,
-            progress: 0,
-        }));
-
-        try {
-
-        } catch {
-
-        }
-
-    }
-    const onDrop = useCallback((acceptedFiles: File[]) => {
-        if(acceptedFiles.length > 0) {
-            const file = acceptedFiles[0]
-
-            setFileState({
-                file: file,
-                uploading: false,
-                progress: 0,
-                objectUrl: URL.createObjectURL(file),
-                error: false,
-                id: uuidv4(),
-                isDeleting: false,
-                fileType: "image"
-            })
-        }
-        console.log(acceptedFiles)
-    }, []);
-
-    function rejectedFiles(fileRejection: FileRejection[]) {
-        if (fileRejection.length) {
-            const tooManyFiles = fileRejection.find((rejection) => rejection.errors[0].code === "too-many-files");
-            const fileSizeTooBig = fileRejection.find(
-                (rejection) => rejection.errors[0].code === "file-too-large"
-            );
-
-            if (fileSizeTooBig) {
-                toast.error("file size limit exceeds");
-            }
-
-            if (tooManyFiles) {
-                toast.error("Too many files selected, max is 1");
-            }
-        }
-    }
-
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({
-        onDrop,
-        accept: { "image/*": [] },
-        maxFiles: 1,
-        multiple: false,
-        maxSize: 5 * 1024 * 1024, // 5MB
-        onDropRejected: rejectedFiles,
-    });
-
-    return (
-        <Card {...getRootProps()} className={cn(
-            "relative border-2 border-dashed transition-colors duration-200 ease-in-out w-full h-64",
-            isDragActive ? 'border-primary bg-primary/10 border-solid' : 'border-border hover:border-primary'
-        )}
-        >
-            <CardContent className="flex items-center justify-center h-full w-full p-4">
-                <input {...getInputProps()} />
-                <RenderEmptyState isDragActive={isDragActive} />
-            </CardContent>
-        </Card>
-    );
-}
+# Masterji - Modern Learning Management System
+
+[![Next.js](https://img.shields.io/badge/Next.js-15.4.6-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19.1.0-blue?style=flat-square&logo=react)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.0-blue?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
+[![Prisma](https://img.shields.io/badge/Prisma-6.13.0-blue?style=flat-square&logo=prisma)](https://www.prisma.io/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-blue?style=flat-square&logo=postgresql)](https://www.postgresql.org/)
+
+## 📚 Project Overview
+
+**Masterji** is a modern, full-stack Learning Management System (LMS) built with cutting-edge web technologies. It provides a comprehensive platform for creating, managing, and delivering online courses with advanced features like drag-and-drop course structuring, rich text editing, and secure file management.
+
+### 🎯 Problem It Solves
+- **Traditional LMS Complexity**: Simplifies course creation and management for instructors
+- **Content Management**: Provides intuitive tools for organizing course content hierarchically
+- **User Experience**: Offers modern, responsive interfaces for both learners and administrators
+- **Security**: Implements robust authentication and authorization systems
+
+### ✨ Key Features
+- **Course Management**: Create, edit, and organize courses with chapters and lessons
+- **Rich Content Editor**: Advanced text editing with TipTap integration
+- **File Management**: Secure S3-compatible storage for images and videos
+- **User Authentication**: Multi-provider authentication with GitHub OAuth and email OTP
+- **Admin Dashboard**: Comprehensive course administration tools
+- **Responsive Design**: Mobile-first approach with modern UI components
+
+## 🛠️ Tech Stack
+
+### Frontend
+- **Framework**: Next.js 15.4.6 (App Router)
+- **Language**: TypeScript 5.0
+- **Styling**: Tailwind CSS 4.0
+- **UI Components**: Radix UI + shadcn/ui
+- **State Management**: React Hook Form + Zod validation
+- **Icons**: Lucide React, Tabler Icons
+
+### Backend
+- **Runtime**: Node.js
+- **Database**: PostgreSQL with Prisma ORM
+- **Authentication**: Better Auth with multiple providers
+- **API**: Next.js API Routes
+- **Validation**: Zod schemas
+
+### Infrastructure & Services
+- **File Storage**: AWS S3-compatible storage
+- **Email Service**: Resend for transactional emails
+- **Security**: Arcjet for bot detection and rate limiting
+- **Deployment**: Vercel-ready configuration
+
+### Development Tools
+- **Linting**: ESLint with Next.js config
+- **Package Manager**: npm
+- **Build Tool**: Next.js with Turbopack
+- **CSS Processing**: PostCSS
+
+## 📁 Folder Structure
+
+```
+masterji/
+├── app/                          # Next.js App Router
+│   ├── (auth)/                  # Authentication routes
+│   │   ├── _components/         # Auth-specific components
+│   │   ├── login/               # Login page
+│   │   └── verify-request/      # Email verification
+│   ├── (public)/                # Public routes
+│   │   ├── _components/         # Public components (Navbar, UserDropdown)
+│   │   └── page.tsx             # Landing page
+│   ├── admin/                   # Admin dashboard
+│   │   ├── courses/             # Course management
+│   │   │   ├── _components/     # Admin course components
+│   │   │   ├── [courseId]/      # Dynamic course routes
+│   │   │   │   └── edit/        # Course editing interface
+│   │   │   └── create/          # Course creation
+│   │   └── layout.tsx           # Admin layout
+│   ├── api/                     # API routes
+│   │   ├── auth/                # Authentication endpoints
+│   │   └── s3/                  # File upload/delete endpoints
+│   ├── data/                    # Server-side data functions
+│   │   └── admin/               # Admin-specific data operations
+│   ├── globals.css              # Global styles
+│   └── layout.tsx               # Root layout
+├── components/                   # Reusable UI components
+│   ├── file-uploader/           # File upload components
+│   ├── rich-text-editor/        # TipTap-based text editor
+│   ├── sidebar/                 # Navigation components
+│   └── ui/                      # shadcn/ui components
+├── hooks/                       # Custom React hooks
+├── lib/                         # Utility libraries
+│   ├── generated/               # Prisma generated types
+│   ├── auth.ts                  # Authentication configuration
+│   ├── db.ts                    # Database connection
+│   ├── S3Client.ts              # S3 client configuration
+│   └── zodSchemas.ts            # Data validation schemas
+├── prisma/                      # Database schema and migrations
+│   └── schema.prisma            # Prisma schema definition
+├── public/                      # Static assets
+└── middleware.ts                # Next.js middleware
+```
+
+## 🚀 Setup Instructions
+
+### Prerequisites
+- Node.js 18+ 
+- PostgreSQL database
+- S3-compatible storage service
+- GitHub OAuth application (for social login)
+
+### 1. Clone Repository
+```bash
+git clone <repository-url>
+cd masterji
+```
+
+### 2. Install Dependencies
+```bash
+npm install
+```
+
+### 3. Environment Configuration
+Create a `.env.local` file in the root directory:
+
+```env
+# Database
+DATABASE_URL="postgresql://username:password@localhost:5432/masterji"
+
+# Authentication
+BETTER_AUTH_SECRET="your-secret-key"
+BETTER_AUTH_URL="http://localhost:3000"
+AUTH_GITHUB_CLIENT_ID="your-github-client-id"
+AUTH_GITHUB_SECRET="your-github-client-secret"
+
+# Email Service
+RESEND_API_KEY="your-resend-api-key"
+
+# Security
+ARCJET_KEY="your-arcjet-key"
+
+# AWS S3 Storage
+AWS_ACCESS_KEY_ID="your-access-key"
+AWS_SECRET_ACCESS_KEY="your-secret-key"
+AWS_ENDPOINT_URL_S3="your-s3-endpoint"
+AWS_ENDPOINT_URL_IAM="your-iam-endpoint"
+AWS_REGION="your-region"
+
+# Client-side
+NEXT_PUBLIC_S3_BUCKET_NAME_IMAGES="your-bucket-name"
+```
+
+### 4. Database Setup
+```bash
+# Generate Prisma client
+npx prisma generate
+
+# Run database migrations
+npx prisma db push
+
+# (Optional) Seed database
+npx prisma db seed
+```
+
+### 5. Development Server
+```bash
+npm run dev
+```
+
+The application will be available at `http://localhost:3000`
+
+## 💻 Usage
+
+### For Learners
+1. **Browse Courses**: Visit the public landing page to explore available courses
+2. **User Registration**: Sign up using email or GitHub OAuth
+3. **Course Access**: Enroll in courses and track progress
+4. **Learning Interface**: Access course content through organized chapters and lessons
+
+### For Instructors/Admins
+1. **Admin Access**: Login with admin credentials
+2. **Course Creation**: Use the admin dashboard to create new courses
+3. **Content Management**: Organize courses into chapters and lessons
+4. **Media Upload**: Upload images and videos using the integrated file manager
+5. **Course Publishing**: Manage course status (draft, published, archived)
+
+### Key Functionalities
+- **Authentication**: Secure login with multiple providers
+- **Course CRUD**: Full course lifecycle management
+- **Content Organization**: Hierarchical chapter-lesson structure
+- **File Management**: Secure upload and storage of media files
+- **Rich Text Editing**: Advanced content creation with TipTap
+- **Responsive Design**: Mobile-optimized interfaces
+
+## 🌟 Features
+
+### Core LMS Features
+- **Course Management**: Create, edit, and organize online courses
+- **Content Hierarchy**: Structured chapters and lessons system
+- **User Roles**: Admin and learner role management
+- **Progress Tracking**: Monitor learning progress and achievements
+
+### Advanced Features
+- **Drag & Drop**: Intuitive course structure management
+- **Rich Text Editor**: Professional content creation tools
+- **File Upload**: Secure media management with progress tracking
+- **Responsive UI**: Modern, mobile-first design
+- **Theme Support**: Light/dark mode with system preference detection
+
+### Security Features
+- **Bot Protection**: Advanced bot detection and blocking
+- **Rate Limiting**: API protection against abuse
+- **Secure Authentication**: Multi-provider auth with session management
+- **File Security**: Presigned URLs for secure file access
+
+## 🔐 Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `DATABASE_URL` | PostgreSQL connection string | ✅ |
+| `BETTER_AUTH_SECRET` | Authentication secret key | ✅ |
+| `BETTER_AUTH_URL` | Application base URL | ✅ |
+| `AUTH_GITHUB_CLIENT_ID` | GitHub OAuth client ID | ✅ |
+| `AUTH_GITHUB_SECRET` | GitHub OAuth client secret | ✅ |
+| `RESEND_API_KEY` | Resend email service API key | ✅ |
+| `ARCJET_KEY` | Arcjet security service key | ✅ |
+| `AWS_ACCESS_KEY_ID` | S3 storage access key | ✅ |
+| `AWS_SECRET_ACCESS_KEY` | S3 storage secret key | ✅ |
+| `AWS_ENDPOINT_URL_S3` | S3 service endpoint | ✅ |
+| `AWS_ENDPOINT_URL_IAM` | IAM service endpoint | ✅ |
+| `AWS_REGION` | AWS region | ✅ |
+| `NEXT_PUBLIC_S3_BUCKET_NAME_IMAGES` | S3 bucket name for images | ✅ |
+
+## 🚀 Deployment
+
+### Local Development
+```bash
+npm run dev          # Development server
+npm run build        # Production build
+npm run start        # Production server
+npm run lint         # Code linting
+```
+
+### Production Deployment
+
+#### Vercel (Recommended)
+1. Connect your GitHub repository to Vercel
+2. Configure environment variables in Vercel dashboard
+3. Deploy automatically on push to main branch
+
+#### Docker Deployment
+```dockerfile
+# Dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+RUN npm run build
+EXPOSE 3000
+CMD ["npm", "start"]
+```
+
+#### Manual Deployment
+1. Build the application: `npm run build`
+2. Start the production server: `npm run start`
+3. Configure reverse proxy (nginx/Apache) if needed
+4. Set up SSL certificates for HTTPS
+
+## 📱 Screenshots & Demo
+
+### Screenshots
+- Landing page with hero section
+- Admin dashboard showing course management
+- Course creation interface
+- Rich text editor in action
+- File upload progress
+- Mobile responsive design
+
+### Demo Links
+- Live demo: [Add your demo URL]
+- Video walkthrough: [Add video link]
+
+## 🤝 Contributing
+
+We welcome contributions to Masterji! Please follow these guidelines:
+
+### Development Setup
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes following the existing code style
+4. Add tests for new functionality
+5. Commit your changes: `git commit -m 'Add amazing feature'`
+6. Push to the branch: `git push origin feature/amazing-feature`
+7. Open a Pull Request
+
+### Code Style
+- Follow TypeScript best practices
+- Use Prettier for code formatting
+- Follow ESLint rules
+- Write meaningful commit messages
+- Add JSDoc comments for complex functions
+
+### Testing
+- Ensure all tests pass before submitting PR
+- Add tests for new features
+- Update tests when modifying existing functionality
+
+## 📄 License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+## 🔗 Integrations & Services
+
+### Authentication & Security
+- **Better Auth**: Modern authentication library with multiple providers
+- **Arcjet**: Bot detection and rate limiting protection
+- **GitHub OAuth**: Social login integration
+
+### Storage & Media
+- **AWS S3**: Scalable file storage for images and videos
+- **Presigned URLs**: Secure, time-limited file access
+
+### Database & ORM
+- **Prisma**: Type-safe database client and migrations
+- **PostgreSQL**: Robust relational database
+
+### Email & Communication
+- **Resend**: Transactional email service for verification
+
+### UI & Components
+- **shadcn/ui**: High-quality, accessible UI components
+- **Radix UI**: Unstyled, accessible component primitives
+- **Tailwind CSS**: Utility-first CSS framework
+
+## 🚀 Performance & Best Practices
+
+### Optimizations Implemented
+- **Next.js 15**: Latest framework with App Router
+- **Turbopack**: Fast bundler for development
+- **Image Optimization**: Next.js built-in image optimization
+- **Code Splitting**: Automatic route-based code splitting
+- **TypeScript**: Type safety and better developer experience
+
+### Security Best Practices
+- **Input Validation**: Zod schema validation
+- **Rate Limiting**: API protection against abuse
+- **Secure File Uploads**: Presigned URLs and file type validation
+- **Authentication**: Secure session management
+- **Environment Variables**: Proper secret management
+
+### Accessibility
+- **Radix UI**: Built-in accessibility features
+- **Semantic HTML**: Proper HTML structure
+- **Keyboard Navigation**: Full keyboard support
+- **Screen Reader**: ARIA labels and descriptions
+
+---
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](link-to-issues)
+- **Discussions**: [GitHub Discussions](link-to-discussions)
+- **Documentation**: [Project Wiki](link-to-wiki)
+
+---
+
+**Built with ❤️ by Zeel Jasani**
