@@ -115,6 +115,7 @@ export async function reorderLesson(
     lesson: { id: string; position: number }[],
     courseId: string
 ): Promise<ApiResponse> {
+    await requireAdmin();
     try {
         if (!lesson || lesson.length === 0) {
             return {
@@ -167,4 +168,45 @@ export async function reorderLesson(
         }
     }
 
+}
+
+
+export async function reorderChapters(
+    courseId: string,
+    chapters: { id: string; position: number }[]
+): Promise<ApiResponse> {
+    await requireAdmin();
+    try {
+        if (!chapters || chapters.length === 0) {
+            return {
+                status: "error",
+                message: "no chapter are provided here"
+            };
+        }
+
+        const updates = chapters.map((chapter) => prisma.chapter.update({
+            where: {
+                id: chapter.id,
+                courseId: courseId,
+            },
+            data: {
+                position: chapter.position,
+            }
+        }))
+
+        await prisma.$transaction(updates);
+
+        revalidatePath(`/admin/courses/${courseId}/edit`)
+
+        return {
+            status: "success",
+            message: "chapter reorder successfully"
+        }
+
+    } catch {
+        return {
+            status: "error",
+            message: "failed to reorder chapter"
+        }
+    }
 }
