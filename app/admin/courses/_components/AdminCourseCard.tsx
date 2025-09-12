@@ -120,6 +120,7 @@ import { AdminCourseType } from "@/app/data/admin/admin-get-courses";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useConstructUrl } from "@/hooks/use-construct-url";
 import { ArrowRight, Eye, MoreVertical, Pencil, School, TimerIcon, Trash2 } from "lucide-react";
 import Image from "next/image";
@@ -133,7 +134,7 @@ export function AdminCourseCard({ data }: iAppProps) {
     const CourseImage = useConstructUrl(data.fileKey);
     return (
         <Card className="group relative py-0 gap-0">
-            
+
             <div className="absolute top-2 right-2 z-10">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -141,12 +142,12 @@ export function AdminCourseCard({ data }: iAppProps) {
                             <MoreVertical className="size-4" />
                         </Button>
                     </DropdownMenuTrigger>
-                    
-                    <DropdownMenuContent 
-                        align="end" 
+
+                    <DropdownMenuContent
+                        align="end"
                         className="w-48 bg-[#2D2D2D] border-gray-700 text-gray-200"
                     >
-                        
+
                         <DropdownMenuItem asChild className="cursor-pointer hover:!bg-gray-700 focus:!bg-gray-700 hover:!text-white">
                             <Link href={`/admin/courses/${data.id}/edit`}>
                                 <Pencil className="size-4 mr-2" />
@@ -163,10 +164,10 @@ export function AdminCourseCard({ data }: iAppProps) {
 
                         {/* [FIXED] Separator બે આઇટમ્સની વચ્ચે હોવો જોઈએ */}
                         <DropdownMenuSeparator className="bg-gray-700" />
-                        
+
                         {/* [CHANGE HERE] ડિલીટ આઇટમને લાલ કલર અને કસ્ટમ સ્ટાઇલ આપી */}
                         <DropdownMenuItem asChild className="cursor-pointer text-red-400 hover:!bg-red-500/10 focus:!bg-red-500/10 hover:!text-red-400">
-                            <Link href={`/courses/${data.id}/delete`}>
+                            <Link href={`/admin/courses/${data.id}/delete`}>
                                 <Trash2 className="size-4 mr-2" />
                                 Delete course
                             </Link>
@@ -214,6 +215,38 @@ export function AdminCourseCard({ data }: iAppProps) {
                     href={`/admin/courses/${data.id}/edit`}>
                     Edit Course <ArrowRight className="size-4 ml-2" />
                 </Link>
+            </CardContent>
+        </Card>
+    );
+}
+
+
+
+export function AdminCourseCardSkeleton() {
+    return (
+        <Card className="group relative py-0 gap-0">
+            <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
+                <Skeleton className="h-6 w-16 rounded-full" />
+                <Skeleton className="size-8 rounded-md" />
+            </div>
+            <div className="w-full relative h-fit">
+                <Skeleton className="w-full rounded-t-lg aspect-video h-[250px] object-cover" />
+            </div>
+            <CardContent className="p-4">
+                <Skeleton className="h-6 w-3/4 mb-2 rounded" />
+                <Skeleton className="h-4 w-full mb-4 rounded" />
+                <div className="mt-4 flex items-center gap-x-5">
+                    <div className="flex items-center gap-x-2">
+                        <Skeleton className="size-6 rounded-md" />
+                        <Skeleton className="h-4 w-10 rounded" />
+                    </div>
+                    <div className="flex items-center gap-x-2">
+                        <Skeleton className="size-6 rounded-md" />
+                        <Skeleton className="h-4 w-10 rounded" />
+                    </div>
+                </div>
+
+                <Skeleton className="mt-4 h-10 w-full rounded" />
             </CardContent>
         </Card>
     );

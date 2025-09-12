@@ -33,11 +33,41 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
-# vercel
-.vercel
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 
 /lib/generated/prisma
+
+# Editors/IDE
+.vscode/
+.idea/
+.fleet/
+
+# OS-specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+._*
+
+# Logs (expanded)
+logs
+*.log
+lerna-debug.log*
+
+# Prisma/DB artifacts
+/node_modules/.prisma
+/prisma/generated
+*.sqlite
+*.sqlite-journal
+*.db
+
+# Caches
+.turbo
+.cache
+
+# dotenv (expanded, base rule already present above)
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

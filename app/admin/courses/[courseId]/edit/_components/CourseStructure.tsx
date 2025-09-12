@@ -18,6 +18,10 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { toast } from "sonner";
 import { reorderChapters, reorderLesson } from "../actions";
+import { NewChapterModel } from "./NewChapterModel";
+import { NewLessonModel } from "./NewLessonModel";
+import { DeleteLesson } from "./DeleteLesson";
+import { DeleteChapter } from "./DeleteChapter";
 
 interface iAppProps {
     data: AdminCourseSingularType
@@ -322,6 +326,7 @@ export function CourseStructure({ data }: iAppProps) {
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between border-b border-border">
                     <CardTitle>Chapters</CardTitle>
+                    <NewChapterModel courseId={data.id} />
                 </CardHeader>
                 <CardContent className="space-y-8">
                     <SortableContext
@@ -365,13 +370,15 @@ export function CourseStructure({ data }: iAppProps) {
                                                         {item.title}
                                                     </p>
                                                 </div>
-                                                <Button
+                                                {/* <Button
                                                     size="icon"
                                                     variant="ghost"
-                                                    className="ml-auto text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                    className="ml-auto text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                                                 >
                                                     <Trash2 className="size-4" />
-                                                </Button>
+                                                </Button> */}
+
+                                                <DeleteChapter chapterId={item.id} courseId={data.id} />
                                             </div>
 
                                             <CollapsibleContent>
@@ -388,22 +395,27 @@ export function CourseStructure({ data }: iAppProps) {
                                                             >
 
                                                                 {(lessonListeners) => (
-                                                                    <div className="flex items-center justify-between p-2 hover:bg-accent rounded-sm">
-                                                                        <div className="flex items-center gap-2">
+                                                                    <div className="flex items-center justify-between p-2 w-full">
+                                                                        <div className="flex items-center gap-2 flex-1">
                                                                             <Button variant="ghost" size="icon"
                                                                                 {...lessonListeners}
+                                                                                className="hover:bg-transparent"
                                                                             >
                                                                                 <GripVertical className="size-4" />
                                                                             </Button>
 
                                                                             <FileText className="size-4" />
-                                                                            <Link href={`/admin/courses/${data.id}/${item.id}/${lesson.id}`}>
+                                                                            <Link
+                                                                                href={`/admin/courses/${data.id}/${item.id}/${lesson.id}`}
+                                                                                className="flex-1 hover:text-primary pl-2"
+                                                                            >
                                                                                 {lesson.title}
                                                                             </Link>
                                                                         </div>
-                                                                        <Button variant="outline" size="icon">
-                                                                            <Trash2 className="size-4" />
-                                                                        </Button>
+                                                                        <DeleteLesson
+                                                                            chapterId={item.id}
+                                                                            lessonId={lesson.id}
+                                                                            courseId={data.id} />
                                                                     </div>
                                                                 )}
                                                             </SortableItem>
@@ -411,7 +423,7 @@ export function CourseStructure({ data }: iAppProps) {
 
                                                     </SortableContext>
                                                     <div className="p-2">
-                                                        <Button variant="outline" className="w-full">Create new lesson</Button>
+                                                        <NewLessonModel chapterId={item.id} courseId={data.id} />
                                                     </div>
                                                 </div>
                                             </CollapsibleContent>
