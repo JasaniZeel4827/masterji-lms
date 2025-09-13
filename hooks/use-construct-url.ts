@@ -1,67 +1,13 @@
-// import { env } from "@/lib/env";
-
-
-// export function useConstructUrl(key: string): string {
-//     return `https://${env.NEXT_PUBLIC_S3_BUCKET_NAME_IMAGES}t3.storage.dev/${key}`;
-// }
-
-
-
-
-
-
-
-
-
-
-// ai no code 
-
-
-// export function useConstructUrl(key: string): string {
-//   return `https://${env.NEXT_PUBLIC_S3_BUCKET_NAME_IMAGES}.t3.storageapi.dev/${key}`;
-// }
-
-
-
-
-// export function useConstructUrl(key: string): string {
-//   return `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME_IMAGES}.t3.storageapi.dev/${key}`;
-// }
-
-
-
-
-
-// 
-
-
-
-
-
-// export function useConstructUrl(key: string): string {
-//   return `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME_IMAGES}.t3.storageapi.dev/${key}`;
-// }
-
-
-
-
-
-
+import { env } from "@/lib/env";
 
 export function useConstructUrl(key: string): string {
-  if (!key) return "";
-  return `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME_IMAGES}.t3.storageapi.dev/${key}`;
+    if (!key) return ''; // Return empty string if no key is provided
+    // Use environment variable from env file which is properly typed and loaded
+    return `https://${env.NEXT_PUBLIC_S3_BUCKET_NAME_IMAGES}.t3.storageapi.dev/${key}`;
 }
 
 
-
-
-
-
-
-
-
-
+    
 
 
 

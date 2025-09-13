@@ -539,7 +539,7 @@
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { courseCategories, courseLevels, courseSchema, CourseSchemaType } from "@/lib/zodSchemas";
+import { courseCategories, courseLevels, courseSchema, CourseSchemaType, courseStatus } from "@/lib/zodSchemas";
 import { ArrowLeft, Loader2, PlusIcon, SparkleIcon} from "lucide-react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
@@ -810,6 +810,55 @@ export default function CourseCreationPage() {
                                         </FormItem>
                                     )}
                                 />
+                                {/* <FormField
+                                    control={form.control}
+                                    name="status"
+                                    render={({ field }) => (
+                                        <FormItem className="w-full">
+                                            <FormLabel>Status</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <FormControl className="max-w-full">
+                                                    <SelectTrigger className="w-full ">
+                                                        <SelectValue placeholder="Select status" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {courseStatus.map((status) => (
+                                                        <SelectItem key={status} value={status}>
+                                                            {status}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                /> */}
+                                <FormField
+                                    control={form.control}
+                                    name="status"
+                                    render={({ field }) => (
+                                        <FormItem className="w-full md:col-span-2">
+                                            <FormLabel>Status</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <FormControl className="max-w-full">
+                                                    <SelectTrigger className="w-full">
+                                                        <SelectValue placeholder="Select status" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {courseStatus.map((status) => (
+                                                        <SelectItem key={status} value={status}>
+                                                            {status}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
                             </div>
                             <Button type="submit" disabled={isPending}>
                                 {isPending ? (
