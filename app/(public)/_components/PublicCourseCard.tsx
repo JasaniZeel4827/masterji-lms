@@ -1,37 +1,3 @@
-// import { PublicCourseType } from "@/app/data/course/get-all-courses";
-// import { Badge } from "@/components/ui/badge";
-// import { Card } from "@/components/ui/card";
-// import { useConstructUrl } from "@/hooks/use-construct-url";
-// import Image from "next/image";
-
-
-
-// interface iAppProps {
-//     data: PublicCourseType
-// }
-
-// export function PublicCourseCard({ data }: { data: iAppProps }) {
-//   const thumbnailUrl = useConstructUrl(data.fileKey);
-//   return (
-//     <Card className="group relative py-0 gap-0">
-//       <Badge className="absolute top-2 right-2 z-10">{data.level}</Badge>
-
-//       <Image
-//         width={600}
-//         height={400}
-//         className="w-full rounded-t-xl aspect-video h-full object-cover"
-//         src={thumbnailUrl}
-//         alt="Thumbnail Image of Course"
-//       />
-//     </Card>
-//   );
-// }
-
-
-
-
-
-
 import { PublicCourseType } from "@/app/data/course/get-all-courses";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
