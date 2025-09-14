@@ -1,6 +1,6 @@
-import { useConstructUrl } from "@/hooks/use-construct-url";
 import { env } from "@/lib/env";
 import Image from "next/image";
+import Link from "next/link";
 import { getIndividualCourse } from "@/app/data/course/get-course";
 import { Badge } from "@/components/ui/badge";
 import { IconBook, IconCategory, IconChartBar, IconChevronDown, IconClock, IconPlayerPlay } from "@tabler/icons-react";
@@ -10,7 +10,11 @@ import { Collapsible } from "@radix-ui/react-collapsible";
 import { Card, CardContent } from "@/components/ui/card";
 import { CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CheckIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { enrollInCourseAction } from "./actions";
+import { checkIfCourseBought } from "@/app/data/user/user-is-enrolled";
+import { EnrollmentButton } from "./_components/EnrollmentButton";
+
 
 
 
@@ -22,10 +26,9 @@ type Params = Promise<{ slug: string }>;
 export default async function SlugPage({ params }: { params: Params }) {
     const { slug } = await params;
     const course = await getIndividualCourse(slug);
-    const thumbnailUrl = useConstructUrl(course.fileKey);
+    const isEnrolled = await checkIfCourseBought(course.id);
 
     return (
-
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 mt-5">
             <div className="order-1 lg:col-span-2">
@@ -263,10 +266,22 @@ export default async function SlugPage({ params }: { params: Params }) {
                             </div>
 
 
+                           
+                            {isEnrolled ? (
+                                <Link className={buttonVariants({ className: "mt-6 w-full" })} 
+                                href="/dashboard">Watch Course</Link>
+                            ) : (
+                                <EnrollmentButton courseId={course.id} />
+                            )}
 
-                            <Button className="w-full mt-6">
-                                Enroll Now
-                            </Button>
+                            {/* <form
+                                action={async () => {
+                                    "use server";
+                                    enrollInCourseAction(course.id);
+                                }}
+                            >
+                                <Button className="mt-6 w-full">Enroll Now!</Button>
+                            </form> */}
                             <p className="mt-3 text-center text-xs text-muted-foreground">30 days money back guarantee</p>
                         </CardContent>
                     </Card>

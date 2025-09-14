@@ -25,7 +25,9 @@ model User {
   sessions      Session[]
   accounts      Account[]
   course        Course[]
-  enrollment    Enrollment[]
+  enrollment    Enrollment[]  
+
+
 
   stripeCustomerId String? @unique
 
@@ -86,16 +88,13 @@ model Verification {
 }
 
 model Course {
-  id          String      @id @default(uuid())
-  title       String
-  description String
-  fileKey     String
-  price       Int
-  duration    Int
-  level       CourseLevel @default(BEGINNER)
-
-  stripePriceId String @unique 
-
+  id               String       @id @default(uuid())
+  title            String
+  description      String
+  fileKey          String
+  price            Int
+  duration         Int
+  level            CourseLevel  @default(BEGINNER)
   category         String
   smallDescription String
   slug             String       @unique
@@ -154,7 +153,7 @@ model Lesson {
 model Enrollment {
   id String @id @default(uuid())
 
-  amout  Int
+  amout Int
   status EnrollmentStatus @default(Pending)
 
   createdAt DateTime @default(now())
@@ -163,9 +162,8 @@ model Enrollment {
   courseId  String
   User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
-
-  @@unique([userId, courseId])
 }
+
 
 enum EnrollmentStatus {
   Pending
