@@ -26,7 +26,7 @@ const aj = arcjet.withRule(
 export async function enrollInCourseAction(courseId: string): Promise<ApiResponse | never> {
     const user = await requireUser();
 
-    let checkoutUrl: string;
+    let checkoutUrl: string | null = null;
 
     try {
         const req = await request();
@@ -57,6 +57,7 @@ export async function enrollInCourseAction(courseId: string): Promise<ApiRespons
                 title: true,
                 price: true,
                 slug: true,
+                stripePriceId: true,
             },
         });
 
@@ -80,8 +81,36 @@ export async function enrollInCourseAction(courseId: string): Promise<ApiRespons
         });
 
         if (userWithStripeCustomerId?.stripeCustomerId) {
-            stripeCustomerId = userWithStripeCustomerId.stripeCustomerId
+            try {
+                // Check if the customer exists in Stripe
+                await stripe.customers.retrieve(userWithStripeCustomerId.stripeCustomerId);
+                stripeCustomerId = userWithStripeCustomerId.stripeCustomerId;
+                console.log('[Enrollment Debug] Using existing Stripe customer:', stripeCustomerId);
+            } catch (error) {
+                console.log('[Enrollment Debug] Customer not found in Stripe, creating new one');
+                // Customer doesn't exist in Stripe, create a new one
+                const customer = await stripe.customers.create({
+                    email: user.email,
+                    name: user.name,
+                    metadata: {
+                        userId: user.id,
+                    },
+                });
+                stripeCustomerId = customer.id;
+
+                // Update the user's stripeCustomerId in the database
+                await prisma.user.update({
+                    where: {
+                        id: user.id,
+                    },
+                    data: {
+                        stripeCustomerId: stripeCustomerId,
+                    },
+                });
+                console.log('[Enrollment Debug] Created new Stripe customer:', stripeCustomerId);
+            }
         } else {
+            console.log('[Enrollment Debug] No existing customer ID, creating new one');
             const customer = await stripe.customers.create({
                 email: user.email,
                 name: user.name,
@@ -99,6 +128,7 @@ export async function enrollInCourseAction(courseId: string): Promise<ApiRespons
                     stripeCustomerId: stripeCustomerId,
                 },
             });
+            console.log('[Enrollment Debug] Created new Stripe customer:', stripeCustomerId);
         }
 
 
@@ -150,13 +180,20 @@ export async function enrollInCourseAction(courseId: string): Promise<ApiRespons
                 });
             }
 
+            console.log('[Enrollment Debug] Creating checkout session with:', {
+                customer: stripeCustomerId,
+                price: course.stripePriceId,
+                courseId: course.id,
+                courseTitle: course.title,
+                userId: user.id
+            });
+
             const checkoutSession = await stripe.checkout.sessions.create({
                 customer: stripeCustomerId,
                 line_items: [
                     {
-                        price: "price_1S6tTWAUMJa24omXXQEbA2e7",
+                        price: course.stripePriceId,
                         quantity: 1,
-
                     }
                 ],
                 mode: 'payment',
@@ -169,6 +206,8 @@ export async function enrollInCourseAction(courseId: string): Promise<ApiRespons
                 },
             });
 
+            console.log('[Enrollment Debug] Checkout session created successfully:', checkoutSession.id);
+
             return {
                 enrollment: enrollment,
                 checkoutUrl: checkoutSession.url,
@@ -177,14 +216,17 @@ export async function enrollInCourseAction(courseId: string): Promise<ApiRespons
 
         checkoutUrl = result.checkoutUrl as string;
     } catch (error) {
+        console.error('[Enrollment Error] Full error details:', error);
+
         if (error instanceof Stripe.errors.StripeError) {
+            console.error('[Enrollment Error] Stripe error:', error.message, error.type, error.code);
             return {
                 status: 'error',
                 message: 'Payment system error. please try again later'
             }
         }
 
-
+        console.error('[Enrollment Error] Non-Stripe error:', error);
 
         return {
             status: "error",
@@ -192,6 +234,13 @@ export async function enrollInCourseAction(courseId: string): Promise<ApiRespons
         };
     }
 
+
+    if (!checkoutUrl) {
+        return {
+            status: "error",
+            message: "Failed to create checkout session",
+        };
+    }
 
     redirect(checkoutUrl)
 }
