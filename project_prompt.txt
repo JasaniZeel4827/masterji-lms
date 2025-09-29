@@ -1,0 +1,144 @@
+Masterji - Mordern Learning Management System 
+
+Project Overview:
+Create a comprehensive online tutoring platform called "Masterji" that connects students with qualified tutors for various subjects. The platform should be built with modern web technologies, focusing on a clean, responsive, and user-friendly interface famous ui components libraries and ui components
+Tech Stack Options:
+
+1. Frontend Framework:
+   - Next.js 14+ (App Router) with TypeScript (Primary)
+   - Alternative: Remix, Gatsby, or Create React App (if needed)
+
+2. Styling Solutions:
+   - Tailwind CSS with custom components (Primary)
+   - CSS Modules or Styled Components for complex UIs
+   - Framer Motion for animations
+   - Radix UI for accessible primitives
+
+3. State Management:
+   - React Query (Server state)
+   - Zustand (Client state)
+   - Jotai/Recoil (Alternative for complex state)
+   - Redux Toolkit (For large-scale state management)
+
+4. Database Options:
+   - Primary: PostgreSQL with Prisma ORM
+   - Alternatives:
+     - MongoDB with Mongoose
+     - Firebase/Firestore
+     - Supabase (PostgreSQL with realtime)
+     - PlanetScale (MySQL compatible)
+
+5. Authentication:
+   - NextAuth.js (Primary)
+   - Clerk
+   - Supabase Auth
+   - Firebase Auth
+   - Custom JWT implementation
+
+6. Real-time Features:
+   - Socket.io (Primary)
+   - Pusher
+   - Ably
+   - Supabase Realtime
+
+7. Payment Processing:
+   - Stripe (Primary)
+   - Razorpay (For Indian payments)
+   - PayPal
+   - Integration with UPI/Net Banking for local payments
+
+8. Deployment & Hosting:
+   - Vercel (Primary for Next.js)
+   - Netlify
+   - AWS Amplify
+   - Self-hosted options (Docker, Kubernetes)
+
+9. Additional Tools:
+   - ESLint + Prettier (Code quality)
+   - Husky (Git hooks)
+   - Cypress/Playwright (E2E testing)
+   - Jest + React Testing Library (Unit/Integration tests)
+   - Sentry (Error tracking)
+   - Vercel Analytics (Performance monitoring)
+
+10. Mobile Considerations:
+    - Responsive web design (Primary)
+    - React Native (For future mobile app)
+    - PWA capabilities
+    - Mobile-optimized UI components
+
+Core Features:
+
+1. User Authentication & Profiles:
+   - Student and tutor registration/login
+   - Email verification
+   - Social login (Google, GitHub)
+   - Profile management for both students and tutors
+   - Tutor verification system
+
+2. Tutor Discovery:
+   - Advanced search with filters (subject, price, rating, availability)
+   - Tutor profiles with ratings, reviews, and demo videos
+   - Availability calendar for each tutor
+   - Booking system with timezone support
+
+3. Virtual Classroom:
+   - Custom video/audio calling interface
+   - Interactive whiteboard
+   - File sharing
+   - Screen sharing
+   - Session recording (with consent)
+   - Chat functionality
+
+4. Payment System:
+   - Secure payment processing
+   - Multiple payment methods
+   - Refund policy
+   - Transaction history
+   - Payout system for tutors
+
+5. Admin Dashboard:
+   - User management
+   - Content moderation
+   - Analytics and reporting
+   - Support ticket system
+
+Design System & UI/UX Requirements:
+
+ Custom UI Components:
+   - Build all components from scratch (no shadcn/ui or component libraries)
+   - Create reusable, atomic components following Atomic Design principles
+   - Implement custom theming system
+   - Design system with consistent spacing, typography, and colors
+
+ Visual Design:
+   - Clean, modern, and professional aesthetic
+   - Custom illustrations and icons
+   - Micro-interactions for better user feedback
+   - Custom animations using Framer Motion
+   - Dark/light mode with smooth transitions
+
+
+ Performance:
+   - Lazy loading for images and components
+   - Smooth 60fps animations
+   - Optimized bundle size
+   - Efficient re-renders with React memo and useMemo
+
+ User Experience:
+   - Intuitive navigation
+   - Clear visual hierarchy
+   - Consistent feedback for user actions
+   - Progressive disclosure of complex features
+   - Helpful error messages and empty states
+   - Loading skeletons for better perceived performance
+
+Additional Requirements:
+- SEO optimized
+- Performance optimized (Lighthouse score >90)
+- Secure (XSS, CSRF protection)
+- Comprehensive error logging
+- Multi-language support (i18n)
+- Push notifications
+- Email notifications
+- File upload (profile pictures, documents)

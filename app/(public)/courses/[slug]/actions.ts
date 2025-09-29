@@ -23,7 +23,7 @@ const aj = arcjet.withRule(
 )
 
 
-export async function enrollInCourseAction(courseId: string): Promise<ApiResponse | never> {
+export async function enrollInCourseAction(courseId: string): Promise<ApiResponse> {
     const user = await requireUser();
 
     let checkoutUrl: string | null = null;
@@ -34,20 +34,10 @@ export async function enrollInCourseAction(courseId: string): Promise<ApiRespons
             fingerprint: user.id,
         });
 
-
-
         if(decision.isDenied()) {
-            return {
-                status: "error",
-                message: "you have been blocked due to too many requests. please try again later",
-            }
-        } 
+            throw new Error("you have been blocked due to too many requests. please try again later");
+        }
 
-
-
-
-
-        
         const course = await prisma.course.findUnique({
             where: {
                 id: courseId,
@@ -62,13 +52,10 @@ export async function enrollInCourseAction(courseId: string): Promise<ApiRespons
         });
 
         if (!course) {
-            return {
-                status: "error",
-                message: "Course not found",
-            };
+            throw new Error("Course not found");
         }
 
-
+        console.log('[Enrollment Debug] Starting enrollment process for user:', user.id, 'course:', courseId);
 
         let stripeCustomerId: string;
         const userWithStripeCustomerId = await prisma.user.findUnique({
@@ -80,65 +67,54 @@ export async function enrollInCourseAction(courseId: string): Promise<ApiRespons
             },
         });
 
-        if (userWithStripeCustomerId?.stripeCustomerId) {
-            try {
-                // Check if the customer exists in Stripe
-                await stripe.customers.retrieve(userWithStripeCustomerId.stripeCustomerId);
-                stripeCustomerId = userWithStripeCustomerId.stripeCustomerId;
-                console.log('[Enrollment Debug] Using existing Stripe customer:', stripeCustomerId);
-            } catch (error) {
-                console.log('[Enrollment Debug] Customer not found in Stripe, creating new one');
-                // Customer doesn't exist in Stripe, create a new one
-                const customer = await stripe.customers.create({
-                    email: user.email,
-                    name: user.name,
-                    metadata: {
-                        userId: user.id,
-                    },
-                });
-                stripeCustomerId = customer.id;
+        console.log('[Enrollment Debug] User stripeCustomerId from DB:', userWithStripeCustomerId?.stripeCustomerId);
 
-                // Update the user's stripeCustomerId in the database
-                await prisma.user.update({
-                    where: {
-                        id: user.id,
-                    },
-                    data: {
-                        stripeCustomerId: stripeCustomerId,
-                    },
-                });
-                console.log('[Enrollment Debug] Created new Stripe customer:', stripeCustomerId);
-            }
-        } else {
-            console.log('[Enrollment Debug] No existing customer ID, creating new one');
-            const customer = await stripe.customers.create({
+        const transactionResult = await prisma.$transaction(async (tx) => {
+            console.log('[Enrollment Debug] Starting database transaction');
+
+            // Always create a fresh customer to avoid race conditions
+            console.log('[Enrollment Debug] Creating fresh customer for enrollment');
+            const freshCustomer = await stripe.customers.create({
                 email: user.email,
                 name: user.name,
-                metadata: {
-                    userId: user.id,
-                },
+                metadata: { userId: user.id },
             });
-            stripeCustomerId = customer.id;
 
-            await prisma.user.update({
-                where: {
-                    id: user.id,
-                },
-                data: {
-                    stripeCustomerId: stripeCustomerId,
-                },
+            // Update database with new customer ID
+            await tx.user.update({
+                where: { id: user.id },
+                data: { stripeCustomerId: freshCustomer.id },
             });
-            console.log('[Enrollment Debug] Created new Stripe customer:', stripeCustomerId);
-        }
 
+            console.log('[Enrollment Debug] Created fresh customer:', freshCustomer.id);
 
+            // Get fresh course data inside transaction to ensure we have current pricing
+            const currentCourse = await tx.course.findUnique({
+                where: { id: courseId },
+                select: {
+                    id: true,
+                    title: true,
+                    price: true,
+                    stripePriceId: true,
+                    slug: true,
+                }
+            });
 
-        const result = await prisma.$transaction(async (tx) => {
+            if (!currentCourse) {
+                throw new Error('Course not found');
+            }
+
+            console.log('[Enrollment Debug] Course price inside transaction:', currentCourse.price, 'cents');
+
+            // Use the actual course price directly (no minimum adjustment)
+            const stripePrice = currentCourse.price;
+            console.log('[Enrollment Debug] Using original course price:', stripePrice, 'cents');
+
             const existingEnrollment = await tx.enrollment.findUnique({
                 where: {
                     userId_courseId: {
                         userId: user.id,
-                        courseId: course.id,
+                        courseId: courseId,
                     },
                 },
                 select: {
@@ -147,100 +123,184 @@ export async function enrollInCourseAction(courseId: string): Promise<ApiRespons
                 }
             });
 
+            console.log('[Enrollment Debug] Existing enrollment found:', existingEnrollment?.id, 'status:', existingEnrollment?.status);
+
             if (existingEnrollment?.status === "Active") {
-                return {
-                    status: "error",
-                    message: "You are already enrolled in this course",
-                };
+                throw new Error("You are already enrolled in this course");
             }
 
-
-            let enrollment
-
+            let enrollment;
 
             if (existingEnrollment) {
+                console.log('[Enrollment Debug] Updating existing enrollment:', existingEnrollment.id);
                 enrollment = await tx.enrollment.update({
                     where: {
                         id: existingEnrollment.id,
                     },
                     data: {
-                        amout: course.price,
+                        amout: currentCourse.price, // Store original course price
                         status: "Pending",
                         updatedAt: new Date(),
                     }
                 })
             } else {
+                console.log('[Enrollment Debug] Creating new enrollment');
                 enrollment = await tx.enrollment.create({
                     data: {
                         userId: user.id,
-                        courseId: course.id,
-                        amout: course.price,
+                        courseId: courseId,
+                        amout: currentCourse.price, // Store original course price
                         status: "Pending",
                     },
                 });
             }
 
-            console.log('[Enrollment Debug] Creating checkout session with:', {
-                customer: stripeCustomerId,
-                price: course.stripePriceId,
-                courseId: course.id,
-                courseTitle: course.title,
-                userId: user.id
-            });
+            console.log('[Enrollment Debug] Enrollment created/updated:', enrollment.id);
 
-            const checkoutSession = await stripe.checkout.sessions.create({
-                customer: stripeCustomerId,
-                line_items: [
-                    {
-                        price: course.stripePriceId,
-                        quantity: 1,
-                    }
-                ],
-                mode: 'payment',
-                success_url: `${env.BETTER_AUTH_URL}/payment/success`,
-                cancel_url: `${env.BETTER_AUTH_URL}/payment/cancel`,
-                metadata: {
-                    userId: user.id,
-                    courseId: course.id,
-                    enrollmentId: enrollment.id,
+            console.log('[Enrollment Debug] Creating checkout session with fresh customer:', freshCustomer.id);
+
+            // Create price data for Stripe using original course price
+            const lineItems = [{
+                price_data: {
+                    currency: 'usd',
+                    product_data: {
+                        name: currentCourse.title,
+                    },
+                    unit_amount: stripePrice, // Use original course price
                 },
-            });
+                quantity: 1,
+            }];
+
+            let checkoutSession;
+            try {
+                checkoutSession = await stripe.checkout.sessions.create({
+                    customer: freshCustomer.id,
+                    line_items: lineItems,
+                    mode: 'payment',
+                    success_url: `${env.BETTER_AUTH_URL}/payment/success`,
+                    cancel_url: `${env.BETTER_AUTH_URL}/payment/cancel`,
+                    metadata: {
+                        userId: user.id,
+                        courseId: courseId,
+                        enrollmentId: enrollment.id,
+                        coursePrice: currentCourse.price.toString(),
+                    },
+                });
+            } catch (stripeError: any) {
+                // Handle specific Stripe errors
+                if (stripeError.code === 'amount_too_small') {
+                    console.log('[Enrollment Debug] Amount too small, creating minimum price session');
+
+                    // Create a minimum viable session with $0.50
+                    const minimumLineItems = [{
+                        price_data: {
+                            currency: 'usd',
+                            product_data: {
+                                name: `${currentCourse.title} (Minimum Payment)`,
+                                description: `Original price: ₹${currentCourse.price}. Processing minimum payment.`,
+                            },
+                            unit_amount: 50, // $0.50 minimum
+                        },
+                        quantity: 1,
+                    }];
+
+                    checkoutSession = await stripe.checkout.sessions.create({
+                        customer: freshCustomer.id,
+                        line_items: minimumLineItems,
+                        mode: 'payment',
+                        success_url: `${env.BETTER_AUTH_URL}/payment/success`,
+                        cancel_url: `${env.BETTER_AUTH_URL}/payment/cancel`,
+                        metadata: {
+                            userId: user.id,
+                            courseId: courseId,
+                            enrollmentId: enrollment.id,
+                            coursePrice: currentCourse.price.toString(),
+                            minimumPayment: 'true',
+                            actualPrice: currentCourse.price.toString(),
+                        },
+                    });
+                } else {
+                    throw stripeError;
+                }
+            }
 
             console.log('[Enrollment Debug] Checkout session created successfully:', checkoutSession.id);
+            console.log('[Enrollment Debug] Checkout session URL:', checkoutSession.url);
+
+            // Validate checkout session has a URL
+            if (!checkoutSession.url) {
+                console.error('[Enrollment Error] Checkout session created but no URL returned:', checkoutSession);
+                throw new Error('Checkout session created but no URL available');
+            }
 
             return {
                 enrollment: enrollment,
                 checkoutUrl: checkoutSession.url,
             }
+        }, {
+            timeout: 30000, // 30 second timeout
         });
 
-        checkoutUrl = result.checkoutUrl as string;
-    } catch (error) {
-        console.error('[Enrollment Error] Full error details:', error);
+        console.log('[Enrollment Debug] Transaction completed successfully');
+        console.log('[Enrollment Debug] Transaction result:', JSON.stringify(transactionResult, null, 2));
 
-        if (error instanceof Stripe.errors.StripeError) {
-            console.error('[Enrollment Error] Stripe error:', error.message, error.type, error.code);
-            return {
-                status: 'error',
-                message: 'Payment system error. please try again later'
-            }
+        if (!transactionResult) {
+            throw new Error('Transaction returned null result');
         }
 
-        console.error('[Enrollment Error] Non-Stripe error:', error);
+        if (!transactionResult.checkoutUrl) {
+            throw new Error('Transaction completed but no checkout URL in result');
+        }
+
+        console.log('[Enrollment Debug] Redirecting to:', transactionResult.checkoutUrl);
+        redirect(transactionResult.checkoutUrl);
+
+    } catch (error) {
+        console.error('[Enrollment Error] Enrollment failed:', error);
+
+        // Don't catch NEXT_REDIRECT errors - let them bubble up for Next.js to handle
+        if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
+            throw error;
+        }
+
+        if (error instanceof Error) {
+            if (error.message.includes("blocked") || error.message.includes("too many requests")) {
+                return {
+                    status: "error",
+                    message: error.message,
+                };
+            }
+
+            if (error.message.includes("Course not found")) {
+                return {
+                    status: "error",
+                    message: error.message,
+                };
+            }
+
+            if (error.message.includes("already enrolled")) {
+                return {
+                    status: "error",
+                    message: error.message,
+                };
+            }
+
+            if (error instanceof Stripe.errors.StripeError) {
+                return {
+                    status: 'error',
+                    message: 'Payment system error. Please try again later.'
+                };
+            }
+
+            return {
+                status: "error",
+                message: error.message,
+            };
+        }
 
         return {
             status: "error",
             message: "Failed to enroll in course",
         };
     }
-
-
-    if (!checkoutUrl) {
-        return {
-            status: "error",
-            message: "Failed to create checkout session",
-        };
-    }
-
-    redirect(checkoutUrl)
 }

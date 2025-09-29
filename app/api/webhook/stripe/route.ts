@@ -72,34 +72,43 @@ export async function POST(req: Request) {
 
             if (enrollmentId) {
                 // Try to update the existing enrollment first
-                const updatedEnrollment = await prisma.enrollment.updateMany({
-                    where: {
-                        id: enrollmentId,
-                        userId: user.id,
-                        courseId: courseId,
-                    },
-                    data: {
-                        status: "Active",
-                        amout: session.amount_total ? Number(session.amount_total) / 100 : 0,
-                        updatedAt: new Date(),
-                    },
-                });
-
-                if (updatedEnrollment.count > 0) {
-                    console.log(`[Stripe Webhook] Successfully updated enrollment ${enrollmentId} to Active`);
-                } else {
-                    console.log(`[Stripe Webhook] Enrollment ${enrollmentId} not found, creating new one`);
-                    // Fallback: create new enrollment if update failed
-                    await prisma.enrollment.create({
-                        data: {
+                try {
+                    const updatedEnrollment = await prisma.enrollment.updateMany({
+                        where: {
                             id: enrollmentId,
                             userId: user.id,
                             courseId: courseId,
-                            amout: session.amount_total ? Number(session.amount_total) / 100 : 0,
+                        },
+                        data: {
                             status: "Active",
+                            amout: session.amount_total ? Number(session.amount_total) / 100 : 0,
+                            updatedAt: new Date(),
                         },
                     });
+
+                    if (updatedEnrollment.count > 0) {
+                        console.log(`[Stripe Webhook] Successfully updated enrollment ${enrollmentId} to Active`);
+                        return new Response(JSON.stringify({ received: true }), { 
+                            status: 200,
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                    } else {
+                        console.log(`[Stripe Webhook] Enrollment ${enrollmentId} not found, creating new one with auto-generated ID`);
+                    }
+                } catch (updateError) {
+                    console.log(`[Stripe Webhook] Error updating enrollment ${enrollmentId}, creating new one:`, updateError);
                 }
+
+                // Fallback: create new enrollment if update failed
+                await prisma.enrollment.create({
+                    data: {
+                        userId: user.id,
+                        courseId: courseId,
+                        amout: session.amount_total ? Number(session.amount_total) / 100 : 0,
+                        status: "Active",
+                    },
+                });
+                console.log(`[Stripe Webhook] Created new enrollment for user ${user.id} in course ${courseId}`);
             } else {
                 console.log(`[Stripe Webhook] No enrollmentId in metadata, creating new enrollment`);
                 // Fallback: create new enrollment if no enrollmentId
@@ -111,24 +120,24 @@ export async function POST(req: Request) {
                         status: "Active",
                     },
                 });
+                console.log(`[Stripe Webhook] Created new enrollment for user ${user.id} in course ${courseId}`);
             }
 
             console.log(`[Stripe Webhook] Successfully processed enrollment for user ${user.id} in course ${courseId}`);
         }
 
-        return new Response(JSON.stringify({ received: true }), { 
+        return new Response(JSON.stringify({ received: true }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
         });
-
     } catch (error) {
         logError('Error processing webhook', error);
         return new Response(
-            JSON.stringify({ 
+            JSON.stringify({
                 error: 'Webhook handler failed',
                 message: error instanceof Error ? error.message : 'Unknown error'
-            }), 
-            { 
+            }),
+            {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
             }
